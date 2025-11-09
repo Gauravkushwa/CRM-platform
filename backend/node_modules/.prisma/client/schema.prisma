@@ -1,0 +1,136 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum LeadStatus {
+  New
+  Contacted
+  Qualified
+  Proposal
+  Won
+  Lost
+}
+
+enum ActivityType {
+  Note
+  Call
+  Meeting
+  Email
+  StatusChange
+}
+
+model Role {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  name          String
+  email         String         @unique
+  password      String
+  roleId        Int
+  role          Role           @relation(fields: [roleId], references: [id])
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  leads         Lead[]         @relation("OwnerLeads")
+  activities    Activity[]
+  notifications Notification[]
+  sessions      Session[]
+
+  // Opposite relation for LeadHistory (ADDED)
+  leadHistories LeadHistory[]
+
+  @@index([roleId])
+  @@index([email])
+}
+
+model Lead {
+  id          Int           @id @default(autoincrement())
+  name        String
+  email       String?
+  phone       String?
+  status      LeadStatus    @default(New)
+  source      String?
+  ownerId     Int
+  owner       User          @relation("OwnerLeads", fields: [ownerId], references: [id])
+  description String?
+  metadata    Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  activities  Activity[]
+  histories   LeadHistory[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Activity {
+  id        Int          @id @default(autoincrement())
+  type      ActivityType
+  content   String
+  leadId    Int
+  userId    Int
+  metadata  Json?
+  createdAt DateTime     @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model LeadHistory {
+  id        Int      @id @default(autoincrement())
+  leadId    Int
+  changedBy Int
+  field     String
+  oldValue  String?
+  newValue  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [changedBy], references: [id])
+
+  @@index([leadId])
+  @@index([changedBy])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  type      String
+  payload   Json
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([isRead])
+  @@index([createdAt])
+}
+
+model Session {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  refreshToken String   @unique
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
