@@ -16,20 +16,17 @@ dotenv.config();
 
 const app = express();
 
-/**
- * Allowed origins (NO trailing slashes)
- * Keep this list in sync with the Socket.IO server.
- */
+// === SINGLE source of truth for allowed origins (no trailing slashes) ===
 export const allowedOrigins = [
   'https://zesty-dieffenbachia-82e67b.netlify.app',
   'http://localhost:5173',
   'http://127.0.0.1:5173'
 ];
 
-// Use the cors middleware so preflights and headers are handled reliably
+// Use official cors middleware so preflights are correct
 app.use(cors({
   origin: (origin, callback) => {
-    // allow non-browser requests (curl/postman)
+    // allow tools/library requests with no origin (curl, Postman, server-to-server)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     callback(new Error('CORS policy: origin not allowed'), false);
@@ -39,28 +36,42 @@ app.use(cors({
   allowedHeaders: 'Content-Type, Authorization, X-Requested-With, Accept'
 }));
 
-// Make sure cookies are parsed (if you set cookies for auth)
+// parse cookies if you use refresh token cookie
 app.use(cookieParser());
 
-// Debug logging - optional but useful during development
+// debug logger for requests
 app.use((req, res, next) => {
-  console.log(`[REQ] ${req.method} ${req.originalUrl} Origin: ${req.headers.origin || 'no-origin'}`);
+  console.log(`[REQ] ${req.method} ${req.originalUrl} - Origin: ${req.headers.origin || 'no-origin'}`);
+  next();
+});
+
+// Add a final response-headers logger for debugging (optional)
+app.use((req, res, next) => {
+  const _send = res.send;
+  res.send = function (body) {
+    try {
+      console.log('[RESPONSE HEADERS]', req.method, req.originalUrl, JSON.stringify(res.getHeaders()));
+    } catch (e) {
+      console.warn('[RESPONSE HEADERS] logging failed', e);
+    }
+    return _send.call(this, body);
+  };
   next();
 });
 
 app.use(express.json());
 app.use(morgan('dev'));
 
-// Simple health route
+// health
 app.get("/", (req, res) => res.json({ ok: true, message: "CRM backend up" }));
 
-// Routes
+// routes
 app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/notifications", notificationRoutes);
 
-// error handler (keep last)
+// error handler (last)
 app.use(errorHandler);
 
 export default app;
