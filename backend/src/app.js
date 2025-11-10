@@ -20,7 +20,8 @@ const app = express();
 export const allowedOrigins = [
   'https://zesty-dieffenbachia-82e67b.netlify.app',
   'http://localhost:5173',
-  'http://127.0.0.1:5173'
+  'http://127.0.0.1:5173',
+  'http://localhost:8080'
 ];
 
 // Use official cors middleware so preflights are correct
