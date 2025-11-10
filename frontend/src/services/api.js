@@ -1,7 +1,46 @@
+// src/api.js
 import axios from 'axios'
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-const client = axios.create({ baseURL: `${BASE}/api` })
+const RAW = import.meta.env.VITE_API_URL || 'https://crm-platform-2.onrender.com'
+const cleaned = RAW.replace(/\/+$/, '') // remove trailing slashes
+const API_BASE = cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`
+
+const client = axios.create({ baseURL: API_BASE, withCredentials: true })
+
+// Debug: log resolved base and env
+console.log('[API] base from env/raw:', RAW)
+console.log('[API] resolved API_BASE:', API_BASE)
+
+// Interceptor: log outgoing request
+client.interceptors.request.use(req => {
+  try {
+    console.log('[API REQUEST]', req.method?.toUpperCase(), req.baseURL + req.url)
+    console.log('[API REQUEST] headers:', req.headers)
+    if (req.params) console.log('[API REQUEST] params:', req.params)
+    if (req.data) console.log('[API REQUEST] body:', req.data)
+  } catch (e) { console.warn('[API REQUEST] logging failed', e) }
+  return req
+}, err => Promise.reject(err))
+
+// Interceptor: log incoming response
+client.interceptors.response.use(res => {
+  console.log('[API RESPONSE]', res.status, res.config?.method?.toUpperCase(), res.config?.url)
+  return res
+}, err => {
+  if (err.response) {
+    // Server responded with a status code
+    console.error('[API ERROR] status:', err.response.status)
+    console.error('[API ERROR] url:', err.config?.baseURL + err.config?.url)
+    console.error('[API ERROR] response data:', err.response.data)
+    console.error('[API ERROR] response headers:', err.response.headers)
+  } else if (err.request) {
+    // Request made but no response
+    console.error('[API ERROR] no response. request:', err.request)
+  } else {
+    console.error('[API ERROR] setup:', err.message)
+  }
+  return Promise.reject(err)
+})
 
 export function setToken(token) {
   if (token) client.defaults.headers.common['Authorization'] = `Bearer ${token}`

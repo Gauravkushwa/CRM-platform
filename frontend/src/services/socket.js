@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client'
 
-const URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const URL = import.meta.env.VITE_API_URL || 'https://crm-platform-2.onrender.com/api'
 let socket = null
 
 export function initSocket(token, userId) {

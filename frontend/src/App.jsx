@@ -33,7 +33,7 @@ export default function App(){
           <Route path="/register" element={<Register />} />
           <Route path="/leads" element={auth.token ? <Leads /> : <Navigate to="/login" />} />
           <Route path="/leads/:id" element={auth.token ? <LeadDetail /> : <Navigate to="/login" />} />
-          <Route path='/activities' element={<ActivitiesPage />} />
+          {/* <Route path='/activities' element={<ActivitiesPage />} /> */}
         </Routes>
       </div>
     </div>

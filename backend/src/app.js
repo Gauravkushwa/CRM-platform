@@ -17,6 +17,19 @@ app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
 
+const corsOptions = {
+    origin: 'http://localhost:5173',    // dev frontend origin; for prod set to your deployed frontend domain
+    methods: ['GET','HEAD','PUT','PATCH','POST','DELETE'],
+    allowedHeaders: ['Content-Type','Authorization', 'X-Requested-With'],
+    credentials: true,                  // if you use cookies/auth credentials
+    optionsSuccessStatus: 204
+  };
+  
+  app.use(cors(corsOptions));
+  
+  // also allow preflight requests for all routes explicitly
+  app.options('*', cors(corsOptions));
+
 app.get("/", (req, res) => res.json({ ok: true, message: "CRM backend up" }));
 
 app.use("/api/auth", authRoutes);
