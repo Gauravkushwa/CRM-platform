@@ -17,9 +17,9 @@ const app = express();
 // It echoes the incoming Origin for allowed origins and sets credentials header.
 // It also handles preflight OPTIONS requests for all routes.
 const allowedOrigins = [
+    'https://zesty-dieffenbachia-82e67b.netlify.app/', // <-- replace with your real frontend domain(s)
   'http://localhost:5173',            // dev frontend origin
-  'http://127.0.0.1:5173',            // alternate local origin
-  'https://zesty-dieffenbachia-82e67b.netlify.app' // <-- replace with your real frontend domain(s)
+  'http://127.0.0.1:5173'         // alternate local origin
 ];
 
 app.use((req, res, next) => {

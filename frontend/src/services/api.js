@@ -1,15 +1,24 @@
 // src/api.js
 import axios from 'axios'
 
-const RAW = import.meta.env.VITE_API_URL || 'https://crm-platform-2.onrender.com'
-const cleaned = RAW.replace(/\/+$/, '') // remove trailing slashes
-const API_BASE = cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`
+const client = axios.create({
+    baseURL: "https://crm-platform-2.onrender.com/api",
+    //https://edviron-software-developer-assessment-xeqi.onrender.com/
+    withCredentials: true, 
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  });
+// const RAW = import.meta.env.VITE_API_URL || 'https://crm-platform-2.onrender.com/'
+// const cleaned = RAW.replace(/\/+$/, '') // remove trailing slashes
+// const API_BASE = cleaned.endsWith('/api') ? cleaned : `${cleaned}/api`
 
-const client = axios.create({ baseURL: API_BASE, withCredentials: true })
+// const client = axios.create({ baseURL: API_BASE, withCredentials: true })
 
 // Debug: log resolved base and env
-console.log('[API] base from env/raw:', RAW)
-console.log('[API] resolved API_BASE:', API_BASE)
+// console.log('[API] base from env/raw:', RAW)
+// console.log('[API] resolved API_BASE:', API_BASE)
 
 // Interceptor: log outgoing request
 client.interceptors.request.use(req => {
