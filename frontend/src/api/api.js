@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+const API_BASE = import.meta.env.VITE_API_URL || 'https://crm-platform-2.onrender.com/api'
 
 
 const api = axios.create({
