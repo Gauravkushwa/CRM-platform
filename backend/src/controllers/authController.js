@@ -5,22 +5,64 @@ import crypto from "crypto";
 
 const prisma = new PrismaClient();
 
+
 export const register = async (req, res) => {
-  const { name, email, password, role = "SalesExecutive" } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ message: "Missing fields" });
+  try {
+    console.log("[REGISTER] payload:", req.body);
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) return res.status(400).json({ message: "Email already in use" });
+    const { name, email, password, role = "SALES" } = req.body;
+    if (!name || !email || !password) {
+      console.warn("[REGISTER] missing fields", { name, email, password });
+      return res.status(400).json({ message: "Missing fields: name, email and password are required" });
+    }
 
-  const hashed = await bcrypt.hash(password, 10);
-  const roleObj = await prisma.role.findUnique({ where: { name: role } });
-  const roleId = roleObj ? roleObj.id : (await prisma.role.findFirst()).id;
+    // normalize role
+    const roleName = String(role || "SALES").trim().toUpperCase();
 
-  const user = await prisma.user.create({
-    data: { name, email, password: hashed, roleId }
-  });
+    // ensure roles exist: try find role, fallback to SALES, create if missing
+    let roleObj = await prisma.role.findUnique({ where: { name: roleName } });
+    if (!roleObj) {
+      console.warn(`[REGISTER] role "${roleName}" not found, falling back to SALES`);
+      roleObj = await prisma.role.findUnique({ where: { name: "SALES" } });
+    }
+    if (!roleObj) {
+      console.warn("[REGISTER] default SALES role missing — creating it now");
+      roleObj = await prisma.role.create({ data: { name: "SALES" } });
+    }
 
-  res.status(201).json({ id: user.id, name: user.name, email: user.email });
+    // double-check existing user
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      console.info("[REGISTER] email already in use:", email);
+      return res.status(409).json({ message: "Email already in use" });
+    }
+
+    // hash and create
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashed,
+        role: { connect: { id: roleObj.id } }
+      },
+      select: { id: true, name: true, email: true, role: { select: { id: true, name: true } } }
+    });
+
+    console.log("[REGISTER] created user id:", user.id);
+    return res.status(201).json({ message: "User created", user });
+  } catch (err) {
+    console.error("[REGISTER] ERROR:", err);
+    // Prisma duplicate error
+    if (err?.code === "P2002") {
+      return res.status(409).json({ message: "Email already in use" });
+    }
+    // return stack in development so you can paste it here
+    return res.status(500).json({
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? String(err.stack || err) : undefined
+    });
+  }
 };
 
 export const login = async (req, res) => {

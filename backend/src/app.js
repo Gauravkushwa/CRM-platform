@@ -11,10 +11,14 @@ import leadRoutes from "./routes/leadRoutes.js";
 import activityRoutes from "./routes/activityRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import errorHandler from "./middlewares/errorHandler.js";
+import userRoutes from './routes/userRoute.js'
 
 dotenv.config();
 
 const app = express();
+
+app.use(express.json());
+app.use(morgan('dev'));
 
 // === SINGLE source of truth for allowed origins (no trailing slashes) ===
 export const allowedOrigins = [
@@ -60,8 +64,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use(morgan('dev'));
+
 
 // health
 app.get("/", (req, res) => res.json({ ok: true, message: "CRM backend up" }));
@@ -71,8 +74,15 @@ app.use("/api/auth", authRoutes);
 app.use("/api/leads", leadRoutes);
 app.use("/api/activities", activityRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/users", userRoutes)
 
 // error handler (last)
 app.use(errorHandler);
+
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err.stack || err);
+    res.status(500).json({ message: 'Internal server error', error: err.message });
+  });
+  
 
 export default app;

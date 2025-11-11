@@ -4,67 +4,76 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+async function ensureRole(name) {
+  // upsert role row (name must be unique in Role model)
+  return prisma.role.upsert({
+    where: { name },
+    update: {},
+    create: { name },
+  });
+}
+
+async function upsertUserWithRole({ email, name, plainPassword, roleId }) {
+  const hashed = await bcrypt.hash(plainPassword, 10);
+
+  const existing = await prisma.user.findUnique({ where: { email } });
+  if (existing) {
+    // update fields and connect role if needed
+    return prisma.user.update({
+      where: { email },
+      data: {
+        name,
+        password: hashed,
+        role: { connect: { id: roleId } },
+      },
+    });
+  } else {
+    return prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashed,
+        role: { connect: { id: roleId } },
+      },
+    });
+  }
+}
+
 async function main() {
   console.log("Seeding database...");
 
-  // 1) Create roles (idempotent)
-  const roles = ["Admin", "Manager", "SalesExecutive"];
-  for (const name of roles) {
-    await prisma.role.upsert({
-      where: { name },
-      update: {},
-      create: { name },
-    });
-  }
-  console.log("Roles ensured");
+  // Use consistent role names (uppercase or whatever you prefer)
+  const adminRole = await ensureRole("ADMIN");
+  const managerRole = await ensureRole("MANAGER");
+  const salesRole = await ensureRole("SALES");
+  console.log("Roles ensured:", adminRole.name, managerRole.name, salesRole.name);
 
-  const adminRole = await prisma.role.findUnique({ where: { name: "Admin" } });
-  const managerRole = await prisma.role.findUnique({ where: { name: "Manager" } });
-  const salesRole = await prisma.role.findUnique({ where: { name: "SalesExecutive" } });
-
-  // 2) Create admin user
-  const adminEmail = "admin@crm.local";
-  const adminPass = "Admin@123"; // change for prod
-  const hashedAdmin = await bcrypt.hash(adminPass, 10);
-
-  const admin = await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      name: "CRM Admin",
-      email: adminEmail,
-      password: hashedAdmin,
-      roleId: adminRole.id,
-    },
+  // 2) Ensure users with connected roles
+  const admin = await upsertUserWithRole({
+    email: "admin@crm.local",
+    name: "CRM Admin",
+    plainPassword: "Admin@123",
+    roleId: adminRole.id,
   });
   console.log("Admin user ensured:", admin.email);
 
-  // 3) Create manager & sales users (idempotent)
-  const alice = await prisma.user.upsert({
-    where: { email: "alice@crm.local" },
-    update: {},
-    create: {
-      name: "Alice Manager",
-      email: "alice@crm.local",
-      password: await bcrypt.hash("Alice@123", 10),
-      roleId: managerRole.id,
-    },
+  const alice = await upsertUserWithRole({
+    email: "alice@crm.local",
+    name: "Alice Manager",
+    plainPassword: "Alice@123",
+    roleId: managerRole.id,
   });
 
-  const bob = await prisma.user.upsert({
-    where: { email: "bob@crm.local" },
-    update: {},
-    create: {
-      name: "Bob Sales",
-      email: "bob@crm.local",
-      password: await bcrypt.hash("Bob@123", 10),
-      roleId: salesRole.id,
-    },
+  const bob = await upsertUserWithRole({
+    email: "bob@crm.local",
+    name: "Bob Sales",
+    plainPassword: "Bob@123",
+    roleId: salesRole.id,
   });
 
   console.log("Sample users ensured:", alice.email, bob.email);
 
-  // 4) Create sample leads using findFirst/create (because name isn't unique)
+  // 3) Create sample leads using findFirst/create (because name isn't unique)
   const existingLead1 = await prisma.lead.findFirst({ where: { name: "Acme Corp" } });
   let lead1;
   if (!existingLead1) {
@@ -107,7 +116,7 @@ async function main() {
     console.log("Lead already exists:", lead2.name);
   }
 
-  // 5) Activities (create if not present)
+  // 4) Activities (create if not present)
   const activities = await prisma.activity.findMany({ where: { leadId: lead1.id } });
   if (activities.length === 0) {
     await prisma.activity.create({
@@ -134,17 +143,16 @@ async function main() {
     console.log("Activities already exist for", lead1.name);
   }
 
-  // 6) Lead history entry (create only if not exists)
+  // 5) Lead history entry (create only if not exists)
   const histories = await prisma.leadHistory.findMany({ where: { leadId: lead1.id } });
   if (histories.length === 0) {
     await prisma.leadHistory.create({
       data: {
         leadId: lead1.id,
-        changedBy: bob.id,
-        field: "status",
-        oldValue: "New",
-        newValue: "Contacted",
-        metadata: { reason: "Intro call" },
+        action: "UPDATE",
+        actorId: bob.id,
+        changes: { field: "status", oldValue: "New", newValue: "Contacted" }, // JSON diff
+        note: "Status changed after intro call",
       },
     });
     console.log("Lead history created for", lead1.name);

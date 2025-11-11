@@ -7,6 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/*
+  Enums
+*/
 enum LeadStatus {
   New
   Contacted
@@ -24,9 +27,21 @@ enum ActivityType {
   StatusChange
 }
 
+// removed enum Role - we will use a Role model instead
+
+enum LeadHistoryAction {
+  CREATE
+  UPDATE
+  TRANSFER
+  DELETE
+}
+
+/*
+  Models
+*/
 model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
+  id    Int     @id @default(autoincrement())
+  name  String  @unique
   users User[]
 }
 
@@ -35,20 +50,23 @@ model User {
   name          String
   email         String         @unique
   password      String
-  roleId        Int
-  role          Role           @relation(fields: [roleId], references: [id])
+  // role relation (was an enum before)
+  roleId        Int?
+  role          Role?          @relation(fields: [roleId], references: [id])
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  // relations
   leads         Lead[]         @relation("OwnerLeads")
   activities    Activity[]
   notifications Notification[]
   sessions      Session[]
 
-  // Opposite relation for LeadHistory (ADDED)
-  leadHistories LeadHistory[]
+  // Opposite relation for LeadHistory
+  leadHistories LeadHistory[]  @relation("ActorHistories")
 
-  @@index([roleId])
   @@index([email])
+  @@index([roleId])
 }
 
 model Lead {
@@ -58,18 +76,22 @@ model Lead {
   phone       String?
   status      LeadStatus    @default(New)
   source      String?
-  ownerId     Int
-  owner       User          @relation("OwnerLeads", fields: [ownerId], references: [id])
+  ownerId     Int?
+  owner       User?         @relation("OwnerLeads", fields: [ownerId], references: [id])
   description String?
   metadata    Json?
+  value       Float?
+  isDeleted   Boolean       @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
   activities  Activity[]
-  histories   LeadHistory[]
+  histories   LeadHistory[] @relation("LeadHistories")
 
   @@index([ownerId])
   @@index([status])
   @@index([createdAt])
+  @@index([isDeleted])
 }
 
 model Activity {
@@ -89,21 +111,22 @@ model Activity {
   @@index([createdAt])
 }
 
+/*
+  LeadHistory: new structure to store atomic actions + JSON diffs
+*/
 model LeadHistory {
-  id        Int      @id @default(autoincrement())
+  id        Int               @id @default(autoincrement())
   leadId    Int
-  changedBy Int
-  field     String
-  oldValue  String?
-  newValue  String?
-  metadata  Json?
-  createdAt DateTime @default(now())
-
-  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [changedBy], references: [id])
+  action    LeadHistoryAction
+  actorId   Int
+  actor     User              @relation("ActorHistories", fields: [actorId], references: [id])
+  lead      Lead              @relation("LeadHistories", fields: [leadId], references: [id], onDelete: Cascade)
+  changes   Json?             // JSON object describing the diff or snapshot
+  note      String?
+  createdAt DateTime          @default(now())
 
   @@index([leadId])
-  @@index([changedBy])
+  @@index([actorId])
   @@index([createdAt])
 }
 
